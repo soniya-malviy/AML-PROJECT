@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exam Grader — AI Pipeline</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f3ef;
+    --surface: #ffffff;
+    --surface2: #f0ede8;
+    --border: rgba(0,0,0,0.09);
+    --border-strong: rgba(0,0,0,0.18);
+    --text: #1a1916;
+    --text-muted: #6b6860;
+    --text-hint: #9e9b95;
+    --accent: #2a4a2e;
+    --accent-light: #e8f0e9;
+    --accent-border: #4a7c52;
+    --warn: #7c4a1a;
+    --warn-bg: #fdf0e4;
+    --danger: #7c1a1a;
+    --danger-bg: #fde8e8;
+    --info: #1a3a7c;
+    --info-bg: #e8eeff;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Inter', sans-serif;
+    --display: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--accent);
+    padding: 1.1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 {
+    font-family: var(--display);
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: #e8f0e9;
+    letter-spacing: 0.01em;
+  }
+  header .badge {
+    background: rgba(255,255,255,0.12);
+    color: #c8deca;
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 54px);
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  /* ── Main ── */
+  .main {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    overflow-y: auto;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+  }
+  .card-title {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-border);
+    flex-shrink: 0;
+  }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius);
+    padding: 2rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+    background: var(--bg);
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent-border);
+    background: var(--accent-light);
+  }
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon {
+    width: 36px; height: 36px;
+    margin: 0 auto 0.6rem;
+    border-radius: 8px;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .upload-zone p { font-size: 13px; color: var(--text-muted); }
+  .upload-zone .hint { font-size: 11px; color: var(--text-hint); margin-top: 3px; }
+  #preview-wrap { display: none; margin-top: 0.75rem; }
+  #preview-img {
+    max-height: 160px;
+    max-width: 100%;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    object-fit: contain;
+  }
+  #preview-name {
+    font-size: 11px; color: var(--text-hint); margin-top: 4px;
+    font-family: var(--mono);
+    word-break: break-all;
+  }
+
+  /* ── Textarea ── */
+  textarea {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    resize: vertical;
+    line-height: 1.6;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--accent-border); }
+  textarea::placeholder { color: var(--text-hint); }
+
+  /* ── Rubric ── */
+  .rubric-list { display: flex; flex-direction: column; gap: 6px; }
+  .rubric-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+  }
+  .rubric-item input[type="text"] {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+  }
+  .rubric-item input[type="text"]::placeholder { color: var(--text-hint); }
+  .rubric-item .tog {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-hint);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  .rubric-item .tog input { margin: 0; cursor: pointer; accent-color: var(--accent); }
+  .del-btn {
+    border: none; background: none; cursor: pointer;
+    font-size: 14px; color: var(--text-hint); line-height: 1;
+    padding: 1px 2px;
+    border-radius: 3px;
+    transition: color 0.1s, background 0.1s;
+  }
+  .del-btn:hover { color: var(--danger); background: var(--danger-bg); }
+  .add-rubric-btn {
+    font-size: 12px;
+    color: var(--accent-border);
+    background: none;
+    border: 1px dashed var(--accent-border);
+    border-radius: var(--radius-sm);
+    padding: 5px 12px;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: background 0.12s;
+    margin-top: 4px;
+    width: 100%;
+  }
+  .add-rubric-btn:hover { background: var(--accent-light); }
+
+  /* ── Select & inputs ── */
+  select, input[type="number"] {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-family: var(--sans);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  select:focus, input[type="number"]:focus { border-color: var(--accent-border); }
+
+  .row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .row label {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  /* ── Run button ── */
+  .run-btn {
+    background: var(--accent);
+    color: #e8f0e9;
+    border: none;
+    border-radius: var(--radius);
+    padding: 11px 0;
+    width: 100%;
+    font-family: var(--display);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .run-btn:hover { opacity: 0.9; }
+  .run-btn:active { transform: scale(0.99); }
+  .run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* ── Right panel tabs ── */
+  .tab-bar {
+    display: flex;
+    gap: 2px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 3px;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 7px 0;
+    border: none;
+    background: transparent;
+    border-radius: 7px;
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: all 0.15s;
+  }
+  .tab-btn.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-hint);
+    gap: 0.5rem;
+  }
+  .empty-state .big { font-size: 40px; margin-bottom: 0.25rem; }
+  .empty-state p { font-size: 13px; }
+
+  /* ── Score display ── */
+  .score-hero {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .score-circle {
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 3px solid transparent;
+  }
+  .score-circle.pass { border-color: var(--accent-border); background: var(--accent-light); }
+  .score-circle.fail { border-color: #c04040; background: var(--danger-bg); }
+  .score-num {
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .score-circle.pass .score-num { color: var(--accent); }
+  .score-circle.fail .score-num { color: var(--danger); }
+  .score-denom { font-size: 11px; color: var(--text-hint); }
+  .verdict-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: 20px;
+    margin-bottom: 4px;
+  }
+  .verdict-badge.pass { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent-border); }
+  .verdict-badge.fail { background: var(--danger-bg); color: var(--danger); border: 1px solid #c04040; }
+  .score-details p { font-size: 13px; color: var(--text-muted); }
+  .score-details strong { color: var(--text); }
+
+  /* ── Component bars ── */
+  .comp-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .comp-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.9rem 1rem;
+  }
+  .comp-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .comp-val {
+    font-family: var(--display);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .bar-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+  .bar-math { background: #3a72b0; }
+  .bar-sem  { background: var(--accent-border); }
+  .bar-rub  { background: #b07a3a; }
+
+  /* ── Weights ── */
+  .weights-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .weight-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    background: var(--bg);
+  }
+
+  /* ── Rubric report ── */
+  .rubric-report-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .rubric-report-item:last-child { border-bottom: none; }
+  .rubric-tag {
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 2px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .tag-exact { background: var(--accent-light); color: var(--accent); }
+  .tag-semantic { background: var(--info-bg); color: var(--info); }
+  .tag-partial { background: var(--warn-bg); color: var(--warn); }
+  .tag-miss { background: var(--danger-bg); color: var(--danger); }
+  .rubric-concept { flex: 1; font-size: 13px; }
+  .rubric-score-val { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
+
+  /* ── OCR block ── */
+  .ocr-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.85rem 1rem;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    max-height: 320px;
+    overflow-y: auto;
+    line-height: 1.7;
+  }
+
+  /* ── Math details ── */
+  .math-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin-bottom: 6px;
+  }
+  .math-ref { font-family: var(--mono); font-size: 12px; color: var(--text-muted); }
+  .math-match { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-top: 2px; }
+  .math-score-pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    margin-top: 4px;
+  }
+
+  /* ── Loader ── */
+  .loader-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 3rem;
+  }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent-border);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader-steps { list-style: none; text-align: left; }
+  .loader-steps li {
+    font-size: 12px;
+    color: var(--text-hint);
+    font-family: var(--mono);
+    padding: 3px 0;
+    transition: color 0.3s;
+  }
+  .loader-steps li.active { color: var(--accent-border); font-weight: 500; }
+  .loader-steps li.done { color: var(--text-muted); }
+  .loader-steps li.done::before { content: '✓ '; }
+  .loader-steps li.active::before { content: '→ '; }
+
+  /* ── Config note ── */
+  .config-note {
+    font-size: 11px;
+    color: var(--text-hint);
+    font-family: var(--mono);
+    line-height: 1.5;
+    padding: 0.65rem 0.85rem;
+    background: var(--bg);
+    border-left: 3px solid var(--accent-border);
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* ── JSON view ── */
+  .json-view {
+    background: #1c1c1b;
+    color: #b8d4b8;
+    border-radius: var(--radius-sm);
+    padding: 1rem;
+    font-family: var(--mono);
+    font-size: 12px;
+    overflow-x: auto;
+    white-space: pre;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+
+  /* ── Tab panels ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; flex-direction: column; gap: 1rem; }
+
+  /* ── Responsive ── */
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    .comp-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Exam Grader</h1>
+  <span class="badge">Lightning AI · Full Pipeline</span>
+</header>
+
+<div class="layout">
+
+  <!-- ──────────── SIDEBAR ──────────── -->
+  <aside class="sidebar">
+
+    <!-- Upload -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Student Answer Image</div>
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" id="img-input" accept="image/*">
+        <div class="upload-icon">📄</div>
+        <p>Drop image here or click to upload</p>
+        <p class="hint">PNG, JPG, WEBP — OCR will extract text</p>
+      </div>
+      <div id="preview-wrap">
+        <img id="preview-img" alt="Preview">
+        <p id="preview-name"></p>
+      </div>
+    </div>
+
+    <!-- Reference / Teacher Answer -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Teacher Reference Answer</div>
+      <textarea id="ref-text" rows="5" placeholder="Paste the model/teacher answer here...
+E.g. The derivative of x^2 is 2x because..."></textarea>
+    </div>
+
+    <!-- Rubric -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Rubric Concepts</div>
+      <div class="rubric-list" id="rubric-list"></div>
+      <button class="add-rubric-btn" onclick="addRubricItem()">+ Add concept</button>
+    </div>
+
+    <!-- Config -->
+    <div class="card">
+      <div class="card-title"><span class="dot"></span>Config</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="row">
+          <label>Question type</label>
+          <select id="q-type" style="flex:1;">
+            <option value="auto">Auto detect</option>
+            <option value="proof">Proof / Math</option>
+            <option value="theory">Theory / Essay</option>
+            <option value="mixed">Mixed</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Pass threshold</label>
+          <input type="number" id="pass-thresh" value="5.0" min="0" max="10" step="0.5" style="width:80px;">
+          <span style="font-size:12px;color:var(--text-hint);">/ 10</span>
+        </div>
+        <div class="config-note">
+Pipeline: OCR (Chandra) → Math (SymPy) → NLI (DeBERTa) → Rubric (spaCy) → Fusion
+        </div>
+      </div>
+    </div>
+
+    <!-- Run -->
+    <button class="run-btn" id="run-btn" onclick="runGrading()">Run Grading Pipeline</button>
+
+    <!-- HF token note -->
+    <p style="font-size:11px;color:var(--text-hint);font-family:var(--mono);text-align:center;line-height:1.5;">
+      Backend expected at <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;">http://localhost:7860</code><br>
+      Set <code style="background:var(--surface2);padding:1px 5px;border-radius:3px;">HF_TOKEN</code> on the server before starting.
+    </p>
+
+  </aside>
+
+  <!-- ──────────── MAIN ──────────── -->
+  <main class="main" id="main-panel">
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('report')">Report</button>
+      <button class="tab-btn" onclick="switchTab('ocr')">OCR Output</button>
+      <button class="tab-btn" onclick="switchTab('math')">Math Details</button>
+      <button class="tab-btn" onclick="switchTab('rubric')">Rubric Coverage</button>
+      <button class="tab-btn" onclick="switchTab('json')">Raw JSON</button>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="empty-state">
+      <div class="big">🎓</div>
+      <p>Upload a student answer image,<br>fill in the reference and rubric, then hit <strong>Run</strong>.</p>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading-state" style="display:none;">
+      <div class="loader-wrap">
+        <div class="spinner"></div>
+        <ul class="loader-steps" id="steps">
+          <li id="step-ocr">OCR extraction (Chandra)</li>
+          <li id="step-math">Math evaluation (SymPy)</li>
+          <li id="step-nli">Semantic scoring (DeBERTa NLI)</li>
+          <li id="step-rub">Rubric coverage (spaCy)</li>
+          <li id="step-fus">Score fusion &amp; report</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Report Tab -->
+    <div id="panel-report" class="tab-panel" style="display:none;">
+
+      <!-- Score hero -->
+      <div class="score-hero" id="score-hero"></div>
+
+      <!-- Component breakdown -->
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Component scores</div>
+        <div class="comp-grid" id="comp-grid"></div>
+      </div>
+
+      <!-- Weights -->
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Fusion weights used</div>
+        <div class="weights-row" id="weights-row"></div>
+        <p style="font-size:11px;color:var(--text-hint);margin-top:8px;font-family:var(--mono);">
+          Weights auto-adjust if a component is unavailable (e.g. no math in answer).
+        </p>
+      </div>
+
+    </div>
+
+    <!-- OCR Tab -->
+    <div id="panel-ocr" class="tab-panel" style="display:none;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>OCR extracted text</div>
+        <pre class="ocr-block" id="ocr-content">—</pre>
+      </div>
+    </div>
+
+    <!-- Math Tab -->
+    <div id="panel-math" class="tab-panel" style="display:none;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Math expression matching</div>
+        <div id="math-details"></div>
+      </div>
+    </div>
+
+    <!-- Rubric Tab -->
+    <div id="panel-rubric" class="tab-panel" style="display:none;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Rubric concept coverage</div>
+        <div id="rubric-details"></div>
+      </div>
+    </div>
+
+    <!-- JSON Tab -->
+    <div id="panel-json" class="tab-panel" style="display:none;">
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Raw pipeline output</div>
+        <pre class="json-view" id="json-view">—</pre>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── State ──
+let uploadedFile = null;
+let currentReport = null;
+let activeTab = 'report';
+let stepInterval = null;
+
+// ── Default rubric items ──
+const defaultConcepts = [
+  { concept: 'photosynthesis', neg: false },
+  { concept: 'chlorophyll', neg: false },
+  { concept: 'sunlight', neg: false },
+];
+defaultConcepts.forEach(c => addRubricItem(c.concept, c.neg));
+
+// ── Rubric management ──
+function addRubricItem(concept = '', neg = false) {
+  const list = document.getElementById('rubric-list');
+  const id = 'ri_' + Date.now() + Math.random().toString(36).slice(2);
+  const div = document.createElement('div');
+  div.className = 'rubric-item';
+  div.dataset.id = id;
+  div.innerHTML = `
+    <input type="text" placeholder="Concept (e.g. photosynthesis)" value="${concept}">
+    <label class="tog">
+      <input type="checkbox" ${neg ? 'checked' : ''}> neg
+    </label>
+    <button class="del-btn" onclick="this.closest('.rubric-item').remove()">×</button>
+  `;
+  list.appendChild(div);
+}
+
+function getRubric() {
+  return Array.from(document.querySelectorAll('.rubric-item')).map(el => ({
+    concept: el.querySelector('input[type="text"]').value.trim(),
+    requires_negation: el.querySelector('input[type="checkbox"]').checked
+  })).filter(r => r.concept);
+}
+
+// ── Upload ──
+const dropZone = document.getElementById('drop-zone');
+const imgInput = document.getElementById('img-input');
+
+imgInput.addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+  uploadedFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('preview-img').src = e.target.result;
+    document.getElementById('preview-name').textContent = file.name;
+    document.getElementById('preview-wrap').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── Tabs ──
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    const tabs = ['report','ocr','math','rubric','json'];
+    btn.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => {
+    p.classList.remove('active');
+    p.style.display = 'none';
+  });
+  const panel = document.getElementById('panel-' + tab);
+  if (panel) { panel.style.display = 'flex'; panel.classList.add('active'); }
+  activeTab = tab;
+}
+
+// ── Fake loader steps animation ──
+function animateSteps() {
+  const steps = ['step-ocr','step-math','step-nli','step-rub','step-fus'];
+  let idx = 0;
+  steps.forEach(s => document.getElementById(s).className = '');
+  stepInterval = setInterval(() => {
+    if (idx > 0) document.getElementById(steps[idx-1]).className = 'done';
+    if (idx < steps.length) {
+      document.getElementById(steps[idx]).className = 'active';
+      idx++;
+    } else {
+      clearInterval(stepInterval);
+    }
+  }, 900);
+}
+
+// ── Run grading ──
+async function runGrading() {
+  if (!uploadedFile) { alert('Please upload a student answer image first.'); return; }
+  const refText = document.getElementById('ref-text').value.trim();
+  if (!refText) { alert('Please enter the teacher reference answer.'); return; }
+
+  const rubric = getRubric();
+  const qType = document.getElementById('q-type').value;
+  const passThresh = parseFloat(document.getElementById('pass-thresh').value);
+
+  // Show loading
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('loading-state').style.display = 'flex';
+  document.querySelectorAll('.tab-panel').forEach(p => { p.style.display = 'none'; p.classList.remove('active'); });
+  document.getElementById('run-btn').disabled = true;
+  animateSteps();
+
+  try {
+    const formData = new FormData();
+    formData.append('image', uploadedFile);
+    formData.append('reference', refText);
+    formData.append('rubric', JSON.stringify(rubric));
+    formData.append('q_type', qType);
+    formData.append('pass_thresh', passThresh);
+
+    const res = await fetch('http://localhost:7860/grade', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+    const report = await res.json();
+    currentReport = report;
+    clearInterval(stepInterval);
+    showResults(report);
+  } catch (err) {
+    clearInterval(stepInterval);
+    // Demo mode: generate a mock result for UI preview
+    const mock = generateMockReport(refText, rubric, qType, passThresh);
+    currentReport = mock;
+    showResults(mock, true);
+  }
+}
+
+// ── Mock report for demo/offline ──
+function generateMockReport(ref, rubric, qType, thresh) {
+  const mathScore = 0.72;
+  const semScore = 0.64;
+  const rubScore = rubric.length > 0 ? 0.55 : null;
+  const type = qType === 'auto' ? 'mixed' : qType;
+  const weights = {
+    proof:  { math: 0.60, semantic: 0.20, rubric: 0.20 },
+    theory: { math: 0.05, semantic: 0.50, rubric: 0.45 },
+    mixed:  { math: 0.35, semantic: 0.35, rubric: 0.30 },
+  }[type];
+  const raw = weights.math * mathScore + weights.semantic * semScore + (rubScore !== null ? weights.rubric * rubScore : 0);
+  const score10 = Math.round(raw * 100) / 10;
+  return {
+    _demo: true,
+    overall_score: score10,
+    verdict: score10 >= thresh ? 'Pass' : 'Fail',
+    question_type_detected: type,
+    ocr_text: '[ Demo mode — backend not reachable ]\n\nThe process of photosynthesis converts light energy\ninto chemical energy stored in glucose.\n\n6CO2 + 6H2O + light → C6H12O6 + 6O2\n\nChlorophyll in the chloroplasts absorbs sunlight.',
+    components: {
+      math_sym_score: mathScore,
+      nli_entailment: semScore,
+      rubric_coverage: rubScore !== null ? rubScore : 0.0,
+    },
+    weights_config: weights,
+    weights_actual: weights,
+    math_details: {
+      math_score: mathScore,
+      details: [
+        { ref: '6CO2 + 6H2O → C6H12O6 + 6O2', student_match: '6CO2 + 6H2O + light → C6H12O6 + 6O2', score: 0.95 },
+        { ref: 'E = mc^2', student_match: null, score: 0.0 },
+      ]
+    },
+    rubric_details: {
+      rubric_coverage: rubScore,
+      concept_scores: Object.fromEntries(rubric.map((r, i) => [r.concept, {
+        score: i === 0 ? 1.0 : i === 1 ? 0.78 : 0.0,
+        method: i === 0 ? 'exact_match' : i === 1 ? 'semantic_match' : 'not_found',
+        found_exact: i === 0,
+        semantic_similarity: i === 1 ? 0.78 : null,
+        best_semantic_match: i === 1 ? 'The green pigment in leaves absorbs light energy.' : null
+      }]))
+    }
+  };
+}
+
+// ── Render results ──
+function showResults(report, isDemo = false) {
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('run-btn').disabled = false;
+
+  // Score hero
+  const pass = report.verdict === 'Pass';
+  const cls = pass ? 'pass' : 'fail';
+  document.getElementById('score-hero').innerHTML = `
+    <div class="score-circle ${cls}">
+      <div class="score-num">${report.overall_score}</div>
+      <div class="score-denom">/ 10</div>
+    </div>
+    <div class="score-details">
+      <div class="verdict-badge ${cls}">${report.verdict}${isDemo ? ' · demo mode' : ''}</div>
+      <p>Type: <strong>${report.question_type_detected || 'mixed'}</strong></p>
+      <p>Semantic entailment: <strong>${(report.components.nli_entailment * 100).toFixed(1)}%</strong></p>
+      ${isDemo ? '<p style="color:var(--warn);font-size:11px;font-family:var(--mono);margin-top:4px;">⚠ Backend offline — showing demo output</p>' : ''}
+    </div>
+  `;
+
+  // Component cards
+  const c = report.components;
+  document.getElementById('comp-grid').innerHTML = `
+    <div class="comp-card">
+      <div class="comp-label">Math (SymPy)</div>
+      <div class="comp-val">${(c.math_sym_score * 100).toFixed(0)}%</div>
+      <div class="bar-track"><div class="bar-fill bar-math" style="width:${c.math_sym_score * 100}%"></div></div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-label">Semantic (NLI)</div>
+      <div class="comp-val">${(c.nli_entailment * 100).toFixed(0)}%</div>
+      <div class="bar-track"><div class="bar-fill bar-sem" style="width:${c.nli_entailment * 100}%"></div></div>
+    </div>
+    <div class="comp-card">
+      <div class="comp-label">Rubric (spaCy)</div>
+      <div class="comp-val">${(c.rubric_coverage * 100).toFixed(0)}%</div>
+      <div class="bar-track"><div class="bar-fill bar-rub" style="width:${c.rubric_coverage * 100}%"></div></div>
+    </div>
+  `;
+
+  // Weights
+  const wa = report.weights_actual;
+  document.getElementById('weights-row').innerHTML = Object.entries(wa).map(([k, v]) =>
+    `<span class="weight-chip">${k}: ${(v * 100).toFixed(0)}%</span>`
+  ).join('');
+
+  // OCR
+  document.getElementById('ocr-content').textContent = report.ocr_text || '(no OCR output)';
+
+  // Math details
+  const md = report.math_details;
+  const mathEl = document.getElementById('math-details');
+  if (md && md.details && md.details.length) {
+    mathEl.innerHTML = md.details.map(d => {
+      const sc = d.score;
+      const pill = sc >= 0.9 ? 'background:#d4f0d4;color:#2a5a2a;' :
+                   sc >= 0.5 ? 'background:#fdf0e4;color:#7c4a1a;' :
+                               'background:#fde8e8;color:#7c1a1a;';
+      return `<div class="math-item">
+        <div class="math-ref">ref: <code>${d.ref}</code></div>
+        <div class="math-match">match: <code>${d.student_match || '—'}</code></div>
+        <span class="math-score-pill" style="${pill}">score: ${d.score.toFixed(2)}</span>
+      </div>`;
+    }).join('');
+  } else {
+    mathEl.innerHTML = '<p style="color:var(--text-hint);font-size:13px;">No math expressions detected.</p>';
+  }
+
+  // Rubric details
+  const rd = report.rubric_details;
+  const rubEl = document.getElementById('rubric-details');
+  if (rd && rd.concept_scores && Object.keys(rd.concept_scores).length) {
+    rubEl.innerHTML = Object.entries(rd.concept_scores).map(([concept, info]) => {
+      const methodClass = {
+        exact_match: 'tag-exact',
+        semantic_match: 'tag-semantic',
+        partial_semantic: 'tag-partial',
+        not_found: 'tag-miss',
+      }[info.method] || 'tag-miss';
+      const methodLabel = {
+        exact_match: 'exact',
+        semantic_match: 'semantic',
+        partial_semantic: 'partial',
+        not_found: 'missing',
+      }[info.method] || info.method;
+      return `<div class="rubric-report-item">
+        <span class="rubric-tag ${methodClass}">${methodLabel}</span>
+        <span class="rubric-concept">${concept}</span>
+        <span class="rubric-score-val">${info.score.toFixed(2)}</span>
+      </div>`;
+    }).join('');
+  } else {
+    rubEl.innerHTML = '<p style="color:var(--text-hint);font-size:13px;">No rubric concepts defined.</p>';
+  }
+
+  // JSON
+  document.getElementById('json-view').textContent = JSON.stringify(report, null, 2);
+
+  // Show report panel
+  switchTab('report');
+}
+</script>
+</body>
+</html>
